@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IGZO Object Recognition</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #07080d;
+    --surface:  #0e1018;
+    --card:     #13161f;
+    --border:   #1e2233;
+    --accent:   #00e5ff;
+    --accent2:  #7b61ff;
+    --hot:      #ff4d6d;
+    --text:     #e8eaf0;
+    --muted:    #636880;
+    --success:  #00e5a0;
+    --mono:     'Space Mono', monospace;
+    --sans:     'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Scanline overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 1.2rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-mark {
+    width: 36px;
+    height: 36px;
+    border: 1.5px solid var(--accent);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .logo-mark::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    background: var(--accent);
+    opacity: 0.15;
+    border-radius: 3px;
+  }
+
+  .logo-mark svg { position: relative; z-index: 1; }
+
+  .logo-text h1 {
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .logo-text p {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.06em;
+  }
+
+  .status-badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-badge.ready {
+    background: rgba(0,229,160,0.1);
+    border: 1px solid rgba(0,229,160,0.3);
+    color: var(--success);
+  }
+
+  .status-badge.error {
+    background: rgba(255,77,109,0.1);
+    border: 1px solid rgba(255,77,109,0.3);
+    color: var(--hot);
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
+
+  /* ── Main layout ── */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* ── Left panel ── */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  /* ── Upload zone ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--card);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0,229,255,0.04);
+  }
+
+  .upload-zone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    background: var(--surface);
+  }
+
+  .upload-zone h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+  }
+
+  .upload-zone p {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+
+  /* ── Image preview ── */
+  .preview-container {
+    display: none;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card);
+    position: relative;
+  }
+
+  .preview-container.show { display: block; }
+
+  .preview-header {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .preview-images {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0;
+  }
+
+  .preview-main {
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+  }
+
+  .preview-main img {
+    max-width: 100%;
+    max-height: 240px;
+    border-radius: 8px;
+    object-fit: contain;
+  }
+
+  .preview-32 {
+    padding: 1rem;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 100px;
+  }
+
+  .preview-32 img {
+    width: 64px;
+    height: 64px;
+    image-rendering: pixelated;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .preview-32 span {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* ── Detect button ── */
+  .detect-btn {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-transform: uppercase;
+  }
+
+  .detect-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .detect-btn:active { transform: translateY(0); }
+  .detect-btn:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .detect-btn.loading {
+    background: var(--card);
+    border: 1.5px solid var(--accent);
+    color: var(--accent);
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Classes chips ── */
+  .classes-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .class-chip {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    padding: 4px 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Right panel ── */
+  .right-panel {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* ── Result card ── */
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .result-card.show { display: block; }
+
+  .result-top {
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result-top::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+      rgba(0,229,255,0.06) 0%, transparent 60%);
+  }
+
+  .result-emoji {
+    font-size: 3rem;
+    line-height: 1;
+    position: relative;
+  }
+
+  .result-info { position: relative; }
+
+  .result-label {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .result-name {
+    font-size: 2rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .result-conf {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .result-conf span { color: var(--success); font-weight: 700; }
+
+  /* ── Probability bars ── */
+  .bars-section { padding: 1.2rem 1.5rem; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 52px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .bar-label {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: right;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+
+  .bar-label.top { color: var(--text); }
+
+  .bar-track {
+    height: 6px;
+    background: var(--surface);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: var(--border);
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 0%;
+  }
+
+  .bar-fill.top { background: var(--accent); }
+  .bar-fill.second { background: var(--accent2); }
+
+  .bar-val {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .bar-val.top { color: var(--accent); }
+
+  /* ── Stats panel ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .stat-cell {
+    background: var(--card);
+    padding: 1rem;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: var(--mono);
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+  }
+
+  .stat-lbl {
+    font-size: 0.62rem;
+    color: var(--muted);
+    margin-top: 3px;
+    font-family: var(--mono);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    color: var(--muted);
+    text-align: center;
+    padding: 3rem;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    min-height: 260px;
+  }
+
+  .empty-state svg { opacity: 0.3; }
+
+  .empty-state h3 {
+    font-size: 1rem;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .empty-state p {
+    font-size: 0.75rem;
+    font-family: var(--mono);
+    line-height: 1.6;
+    max-width: 260px;
+  }
+
+  /* ── IGZO Physics info ── */
+  .physics-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .physics-header {
+    padding: 0.8rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--muted);
+    font-family: var(--mono);
+    letter-spacing: 0.06em;
+  }
+
+  .physics-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+  }
+
+  .physics-body {
+    padding: 1rem 1.2rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0.8rem;
+  }
+
+  .phys-item { }
+
+  .phys-key {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+
+  .phys-val {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--accent2);
+    font-weight: 700;
+  }
+
+  /* ── Error toast ── */
+  .error-msg {
+    display: none;
+    background: rgba(255,77,109,0.1);
+    border: 1px solid rgba(255,77,109,0.3);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    color: var(--hot);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+  }
+
+  .error-msg.show { display: block; }
+
+  /* ── Responsive ── */
+  @media (max-width: 820px) {
+    .main { grid-template-columns: 1fr; }
+    .left-panel { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="2" y="2" width="6" height="6" rx="1" fill="#00e5ff" opacity="0.8"/>
+        <rect x="10" y="2" width="6" height="6" rx="1" fill="#00e5ff" opacity="0.4"/>
+        <rect x="2" y="10" width="6" height="6" rx="1" fill="#00e5ff" opacity="0.4"/>
+        <rect x="10" y="10" width="6" height="6" rx="1" fill="#00e5ff" opacity="0.8"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>IGZO Neural Recognition</h1>
+      <p>IGZO/MgO Synaptic Transistor · CNN + P/D Physics</p>
+    </div>
+  </div>
+
+  {% if model_ready %}
+  <div class="status-badge ready">
+    <div class="dot"></div>
+    MODEL READY · {{ accuracy }}% ACC
+  </div>
+  {% else %}
+  <div class="status-badge error">
+    <div class="dot"></div>
+    MODEL NOT LOADED
+  </div>
+  {% endif %}
+</header>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- ── LEFT PANEL ── -->
+  <div class="left-panel">
+
+    <div>
+      <div class="panel-label">Input image</div>
+      <div class="upload-zone" id="uploadZone"
+           ondragover="handleDrag(event, true)"
+           ondragleave="handleDrag(event, false)"
+           ondrop="handleDrop(event)">
+        <input type="file" id="fileInput" accept="image/*"
+               onchange="handleFile(this.files[0])">
+        <div class="upload-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h3>Drop image here</h3>
+        <p>or click to browse · PNG, JPG, JPEG, WEBP</p>
+      </div>
+    </div>
+
+    <!-- Image preview -->
+    <div class="preview-container" id="previewContainer">
+      <div class="preview-header">
+        <span id="fileName">image.jpg</span>
+        <span id="fileSize">0 KB</span>
+      </div>
+      <div class="preview-images">
+        <div class="preview-main">
+          <img id="previewImg" src="" alt="Preview">
+        </div>
+        <div class="preview-32">
+          <img id="preview32" src="" alt="32x32">
+          <span>32×32 px<br>model input</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error message -->
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- Detect button -->
+    <button class="detect-btn" id="detectBtn"
+            onclick="runDetection()" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="M21 21l-4.35-4.35"/>
+      </svg>
+      Detect Object
+    </button>
+
+    <!-- Supported classes -->
+    <div>
+      <div class="panel-label">Supported classes (10)</div>
+      <div class="classes-grid">
+        {% for name in class_names %}
+        <div class="class-chip">{{ class_emoji[name] }} {{ name }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- IGZO physics info -->
+    <div class="physics-card" id="physicsCard">
+      <div class="physics-header">
+        <div class="physics-dot"></div>
+        IGZO transistor physics
+      </div>
+      <div class="physics-body" id="physicsBody">
+        <div class="phys-item">
+          <div class="phys-key">avg_pot</div>
+          <div class="phys-val" id="phys-pot">—</div>
+        </div>
+        <div class="phys-item">
+          <div class="phys-key">avg_dep</div>
+          <div class="phys-val" id="phys-dep">—</div>
+        </div>
+        <div class="phys-item">
+          <div class="phys-key">P/D ratio</div>
+          <div class="phys-val" id="phys-ratio">—</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="right-panel">
+
+    <!-- Model stats row -->
+    <div class="stats-row">
+      <div class="stat-cell">
+        <div class="stat-val" id="statAcc">{{ accuracy }}%</div>
+        <div class="stat-lbl">test accuracy</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val">10</div>
+        <div class="stat-lbl">object classes</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-val">CNN</div>
+        <div class="stat-lbl">+ IGZO P/D</div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="emptyState">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+      <h3>No image detected yet</h3>
+      <p>Upload a photo of a car, plane, animal,<br>
+         ship or truck to classify it with the<br>
+         IGZO synaptic neural network.</p>
+    </div>
+
+    <!-- Result card (hidden until prediction) -->
+    <div class="result-card" id="resultCard">
+      <div class="result-top">
+        <div class="result-emoji" id="resultEmoji">🚗</div>
+        <div class="result-info">
+          <div class="result-label">Detected object</div>
+          <div class="result-name" id="resultName">—</div>
+          <div class="result-conf">
+            Confidence: <span id="resultConf">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="bars-section" id="barsSection">
+        <!-- bars injected by JS -->
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let selectedFile = null;
+
+  // ── Load physics info on startup ──────────────────────────
+  fetch('/model_info')
+    .then(r => r.json())
+    .then(d => {
+      if (d.avg_pot) {
+        document.getElementById('phys-pot').textContent   = d.avg_pot.toFixed(6);
+        document.getElementById('phys-dep').textContent   = d.avg_dep.toFixed(6);
+        document.getElementById('phys-ratio').textContent = d.pd_ratio.toFixed(1) + 'x';
+      }
+    });
+
+  // ── Drag & drop ───────────────────────────────────────────
+  function handleDrag(e, over) {
+    e.preventDefault();
+    document.getElementById('uploadZone')
+      .classList.toggle('drag-over', over);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('uploadZone').classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  }
+
+  // ── File selected ─────────────────────────────────────────
+  function handleFile(file) {
+    if (!file) return;
+    selectedFile = file;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      document.getElementById('previewImg').src = e.target.result;
+      document.getElementById('previewContainer').classList.add('show');
+    };
+    reader.readAsDataURL(file);
+
+    // Metadata
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent =
+      (file.size / 1024).toFixed(1) + ' KB';
+
+    // Enable button
+    document.getElementById('detectBtn').disabled = false;
+    document.getElementById('errorMsg').classList.remove('show');
+
+    // Reset results
+    document.getElementById('resultCard').classList.remove('show');
+    document.getElementById('emptyState').style.display = 'flex';
+  }
+
+  // ── Run detection ─────────────────────────────────────────
+  function runDetection() {
+    if (!selectedFile) return;
+
+    const btn = document.getElementById('detectBtn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.innerHTML = '<div class="spinner"></div> Analysing...';
+
+    document.getElementById('errorMsg').classList.remove('show');
+
+    const formData = new FormData();
+    formData.append('image', selectedFile);
+
+    fetch('/predict', { method: 'POST', body: formData })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          showError(data.error);
+        } else {
+          showResult(data);
+        }
+      })
+      .catch(err => showError('Network error: ' + err))
+      .finally(() => {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="M21 21l-4.35-4.35"/>
+          </svg>
+          Detect Again`;
+      });
+  }
+
+  // ── Show result ───────────────────────────────────────────
+  function showResult(data) {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('resultCard').classList.add('show');
+
+    // Update 32x32 preview
+    document.getElementById('preview32').src =
+      'data:image/png;base64,' + data.image_32;
+
+    // Top result
+    document.getElementById('resultEmoji').textContent = data.emoji;
+    document.getElementById('resultName').textContent  =
+      data.prediction.toUpperCase();
+    document.getElementById('resultConf').textContent  =
+      data.confidence.toFixed(1) + '%';
+
+    // Build probability bars
+    const bars = document.getElementById('barsSection');
+    bars.innerHTML = '';
+
+    data.results.forEach((item, i) => {
+      const isTop    = i === 0;
+      const isSecond = i === 1;
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `
+        <div class="bar-label ${isTop ? 'top' : ''}">
+          <span>${item.emoji}</span>
+          <span>${item.class}</span>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill ${isTop ? 'top' : isSecond ? 'second' : ''}"
+               id="bar_${i}" style="width:0%"></div>
+        </div>
+        <div class="bar-val ${isTop ? 'top' : ''}">
+          ${item.prob.toFixed(1)}%
+        </div>`;
+      bars.appendChild(row);
+
+      // Animate bar fill
+      setTimeout(() => {
+        document.getElementById(`bar_${i}`).style.width = item.prob + '%';
+      }, 50 + i * 40);
+    });
+  }
+
+  // ── Show error ────────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = '⚠ ' + msg;
+    el.classList.add('show');
+  }
+
+  // ── Keyboard shortcut: Enter to detect ───────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && selectedFile &&
+        !document.getElementById('detectBtn').disabled) {
+      runDetection();
+    }
+  });
+</script>
+</body>
+</html>
