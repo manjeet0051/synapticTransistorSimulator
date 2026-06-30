@@ -1,110 +1,231 @@
-# IGZO/MgO Synaptic Transistor — Complete ML Project
-### Neuromorphic Digit Recognition System
+# IGZO/MgO Synaptic Transistor for Neuromorphic Digit Recognition
+
+A machine learning framework that models an **IGZO/MgO synaptic transistor** and uses its experimentally measured electrical characteristics for **neuromorphic handwritten digit recognition**. The project integrates device-level physics with neural network training by directly utilizing the transistor's potentiation and depression behavior for synaptic weight updates.
+
+---
+
+## Features
+
+* Extraction of device parameters from measured transfer characteristics
+* IDS prediction using Polynomial Regression and Neural Networks
+* EPSC gain prediction from frequency response data
+* Standard MNIST digit recognition for baseline comparison
+* Physics-aware learning using experimentally measured IGZO potentiation/depression curves
+* Interactive GUI for handwritten digit prediction
 
 ---
 
 ## Project Structure
-```
+
+```text
 igzo_project/
 ├── data/
-│   ├── IDVD_IDBG_IGZO_MgO.csv              ← Lab ka Transfer curve data
-│   └── filterchar_IGZO_MgO_new.csv          ← EPSC frequency data
+│   ├── IDVD_IDBG_IGZO_MgO.csv
+│   └── filterchar_IGZO_MgO_new.csv
 │
-├── models/                                   ← Trained models yahan save honge
-│   ├── device_params.pkl                    ← Vth, ION/IOFF, SS etc.
-│   ├── poly_model.pkl                       ← Polynomial IDS predictor
-│   ├── nn_model.pkl                         ← Neural Net IDS predictor
-│   ├── gain_model.pkl                       ← EPSC Gain model
-│   ├── igzo_digit_model.pkl                 ← Standard digit model
-│   └── igzo_TRUE_digit_model.pkl            ← TRUE IGZO digit model (BEST)
+├── models/
+│   ├── device_params.pkl
+│   ├── poly_model.pkl
+│   ├── nn_model.pkl
+│   ├── gain_model.pkl
+│   ├── igzo_digit_model.pkl
+│   └── igzo_TRUE_digit_model.pkl
 │
-├── 1_train_model.py                         ← STEP 1: Device model train karo
-├── 2_digit_recognition.py                   ← STEP 2: Standard digit recognition
-├── 2b_digit_recognition_IGZO_TRUE.py        ← STEP 2b: TRUE IGZO learning (BEST)
-├── 3_app.py                                 ← STEP 3: GUI app
+├── 1_train_model.py
+├── 2_digit_recognition.py
+├── 2b_digit_recognition_IGZO_TRUE.py
+├── 3_app.py
 ├── requirements.txt
 └── README.md
 ```
 
 ---
 
-## Konsa Model Tera Hai?
+## Dataset Description
 
-| File | Tera IGZO? | Kya karta hai |
-|------|-----------|---------------|
-| poly_model.pkl | 100% TERA | VGS se IDS predict karta hai |
-| nn_model.pkl | 100% TERA | VGS se IDS predict karta hai |
-| gain_model.pkl | 100% TERA | Frequency se EPSC Gain predict |
-| igzo_digit_model.pkl | Partial | IGZO weight quantization only |
-| igzo_TRUE_digit_model.pkl | 100% TERA | IGZO P/D curve se seekha (BEST) |
+### `IDVD_IDBG_IGZO_MgO.csv`
+
+Contains experimentally measured transfer characteristics of the IGZO/MgO synaptic transistor, including:
+
+* Gate voltage (VGS)
+* Drain current (IDS)
+* Transfer curve information
+* Potentiation and depression conductance states
+
+The project utilizes all available conductance states as discrete synaptic weight levels.
+
+### `filterchar_IGZO_MgO_new.csv`
+
+Contains frequency-dependent excitatory post-synaptic current (EPSC) measurements used for gain modeling.
 
 ---
 
-## Setup — Sirf ek baar karo
+## Installation
 
-Python 3.10+ install karo: https://python.org/downloads
-Install karte waqt "Add to PATH" zaroor tick karo!
+### Prerequisites
 
-CMD mein:
+* Python 3.10 or later
+* pip package manager
+
+### Clone the Repository
+
+```bash
+git clone <repository-url>
+cd igzo_project
 ```
+
+### Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
 ---
 
-## Run Order — Ye sequence follow karo
+## Execution Workflow
 
-### STEP 1
-```
+### Step 1: Train Device Models
+
+```bash
 python 1_train_model.py
 ```
-Device parameters + IDS predictor models ban jayenge
 
-### STEP 2b — TRUE IGZO (Recommended)
-```
-python 2b_digit_recognition_IGZO_TRUE.py
-```
-100% tera transistor seekhega — P/D curve se weight update hoga
+This script:
 
-### STEP 2 — Standard (Optional comparison ke liye)
-```
-python 2_digit_recognition.py
-```
-Standard optimizer — zyada accuracy lekin IGZO physics kam
+* Extracts device parameters
+* Trains IDS prediction models
+* Trains the EPSC gain prediction model
+* Saves all generated models in the `models/` directory
 
-### STEP 3 — GUI App
+Generated files:
+
+```text
+models/
+├── device_params.pkl
+├── poly_model.pkl
+├── nn_model.pkl
+└── gain_model.pkl
 ```
-python 3_app.py
-```
-Draw karo digit — model predict karega
 
 ---
 
-## TRUE IGZO Learning Kya Hai?
+### Step 2: Standard Digit Recognition (Baseline)
 
-Standard:   W = W - lr x gradient  (math formula)
-IGZO TRUE:  W = igzo.potentiate(W) se  (teri CSV ka actual dG/dVGS)
-            W = igzo.depress(W) se      (teri CSV ka actual dG/dVGS)
+```bash
+python 2_digit_recognition.py
+```
 
-402 conductance states = IDVD_IDBG_IGZO_MgO.csv ke 402 data points
+This model uses conventional gradient-based optimization and serves as a baseline for comparison.
+
+Generated file:
+
+```text
+models/igzo_digit_model.pkl
+```
+
+---
+
+### Step 2b: TRUE IGZO Neuromorphic Learning (Recommended)
+
+```bash
+python 2b_digit_recognition_IGZO_TRUE.py
+```
+
+This implementation directly incorporates the experimentally measured transistor behavior into the learning process.
+
+Instead of using the conventional update rule:
+
+```text
+W = W − η × ∇L
+```
+
+the synaptic weights are updated according to the measured device characteristics:
+
+```text
+W = igzo.potentiate(W)
+W = igzo.depress(W)
+```
+
+This approach enables:
+
+* Physics-aware learning
+* Discrete conductance state transitions
+* Hardware-realistic synaptic updates
+* Improved compatibility with neuromorphic hardware implementation
+
+Generated file:
+
+```text
+models/igzo_TRUE_digit_model.pkl
+```
+
+---
+
+### Step 3: Launch the GUI Application
+
+```bash
+python 3_app.py
+```
+
+The application allows users to:
+
+1. Draw a handwritten digit
+2. Preprocess the image
+3. Run inference using the trained model
+4. Display the predicted digit
+
+---
+
+## Models
+
+| Model                       | Description                                 |
+| --------------------------- | ------------------------------------------- |
+| `poly_model.pkl`            | Polynomial IDS predictor                    |
+| `nn_model.pkl`              | Neural-network-based IDS predictor          |
+| `gain_model.pkl`            | EPSC gain predictor                         |
+| `igzo_digit_model.pkl`      | Standard digit classifier                   |
+| `igzo_TRUE_digit_model.pkl` | Physics-aware neuromorphic digit classifier |
 
 ---
 
 ## Troubleshooting
 
-ModuleNotFoundError:
-  pip install -r requirements.txt
+### ModuleNotFoundError
 
-FileNotFoundError models:
-  Pehle python 1_train_model.py chalao
+```bash
+pip install -r requirements.txt
+```
 
-App nahi khul rahi:
-  pip install pillow --upgrade
+### Model Files Not Found
 
-MNIST slow download:
-  Internet chahiye pehli baar — 11MB file hai
+Ensure that the following script has been executed first:
+
+```bash
+python 1_train_model.py
+```
+
+### GUI Does Not Open
+
+```bash
+pip install --upgrade pillow
+```
+
+### Slow MNIST Download
+
+The MNIST dataset is downloaded only during the first execution and requires an active internet connection.
 
 ---
 
-Based on paper: Low-Temperature Solution-Processed In2O3 Synaptic Transistors
-IEEE Transactions on Electron Devices, Vol. 73, No. 1, Jan 2026
+## Research Motivation
+
+Conventional neural network training uses idealized mathematical weight updates that may not accurately represent the behavior of physical synaptic devices. This project bridges the gap between machine learning algorithms and hardware implementation by using experimentally measured characteristics of an IGZO/MgO synaptic transistor to perform synaptic updates.
+
+The resulting framework provides a practical approach toward implementing energy-efficient neuromorphic computing systems based on oxide semiconductor synaptic transistors.
+
+---
+
+## Citation
+
+If you use this project in your research, please cite:
+
+*Low-Temperature Solution-Processed In₂O₃ Synaptic Transistors*, IEEE Transactions on Electron Devices, Vol. 73, No. 1, January 2026.
